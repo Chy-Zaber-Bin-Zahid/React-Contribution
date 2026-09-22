@@ -835,8 +835,10 @@ function collectDependencies(
       }
 
       if (block.terminal.kind === 'optional') {
-        // Unused chains have no consuming phi, so record them here.
-        // See `OptionalChainSidemap.unusedOptionalChains`.
+        /*
+         * Unused chains have no consuming phi, so record them here.
+         * See `OptionalChainSidemap.unusedOptionalChains`.
+         */
         const unusedOptionalChain = unusedOptionalChains.get(block.terminal);
         if (unusedOptionalChain != null) {
           context.visitDependency(unusedOptionalChain);
