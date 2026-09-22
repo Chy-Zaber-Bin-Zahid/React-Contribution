@@ -32,6 +32,7 @@ import {
   PropertyLiteral,
   convertHoistedLValueKind,
   SourceLocation,
+  OptionalTerminal,
 } from './HIR';
 import {
   collectHoistablePropertyLoads,
@@ -58,6 +59,7 @@ export function propagateScopeDependenciesHIR(fn: HIRFunction): void {
     temporariesReadInOptional,
     processedInstrsInOptional,
     hoistableObjects,
+    unusedOptionalChains,
   } = collectOptionalChainSidemap(fn);
 
   const hoistablePropertyLoads = keyByScopeId(
@@ -70,6 +72,7 @@ export function propagateScopeDependenciesHIR(fn: HIRFunction): void {
     usedOutsideDeclaringScope,
     new Map([...temporaries, ...temporariesReadInOptional]),
     processedInstrsInOptional,
+    unusedOptionalChains,
   );
 
   /**
@@ -763,6 +766,7 @@ function collectDependencies(
   usedOutsideDeclaringScope: ReadonlySet<DeclarationId>,
   temporaries: ReadonlyMap<IdentifierId, ReactiveScopeDependency>,
   processedInstrsInOptional: ReadonlySet<Instruction | Terminal>,
+  unusedOptionalChains: ReadonlyMap<OptionalTerminal, ReactiveScopeDependency>,
 ): Map<ReactiveScope, Array<ReactiveScopeDependency>> {
   const context = new DependencyCollectionContext(
     usedOutsideDeclaringScope,
@@ -827,6 +831,20 @@ function collectDependencies(
           );
         } else {
           handleInstruction(instr, context);
+        }
+      }
+
+      if (block.terminal.kind === 'optional') {
+        /**
+         * Optional chains are normally recorded as a dependency where their
+         * value is consumed (e.g. the phi at the chain's fallthrough). If the
+         * value is unused that phi has been pruned, so record the chain here
+         * to ensure its base is still declared as an output of its defining
+         * scope, if any.
+         */
+        const unusedOptionalChain = unusedOptionalChains.get(block.terminal);
+        if (unusedOptionalChain != null) {
+          context.visitDependency(unusedOptionalChain);
         }
       }
 
