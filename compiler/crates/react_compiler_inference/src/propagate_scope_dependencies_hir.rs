@@ -411,19 +411,9 @@ struct OptionalChainSidemap {
     temporaries_read_in_optional: FxHashMap<IdentifierId, ReactiveScopeDependency>,
     processed_instrs_in_optional: FxHashSet<ProcessedInstr>,
     hoistable_objects: FxHashMap<BlockId, ReactiveScopeDependency>,
-    /// Outermost optional chains whose value is never consumed, keyed by the
-    /// block id of the chain's optional terminal.
-    ///
-    /// Instructions within an optional chain are skipped during dependency
-    /// collection (see `processed_instrs_in_optional`) and the chain is instead
-    /// recorded as a dependency where its value is consumed, e.g. by the phi at
-    /// the chain's fallthrough block. If the value is unused (e.g. the `_` in
-    /// `const _ = a?.b`), that phi is pruned by DCE and nothing would otherwise
-    /// visit the chain, so the chain's base (`a`) would never be recorded as an
-    /// output of its declaring scope even though the chain is preserved as an
-    /// expression statement after that scope.
-    ///
-    /// `collect_dependencies` visits these chains at their terminal instead.
+    /// Outermost optional chains whose value is never consumed (no phi at the
+    /// fallthrough references the result), keyed by the optional block id.
+    /// Corresponds to TS `OptionalChainSidemap.unusedOptionalChains`.
     unused_optional_chains: FxHashMap<BlockId, ReactiveScopeDependency>,
 }
 
@@ -2391,11 +2381,8 @@ fn handle_function_deps(
             }
         }
 
-        // Optional chains are normally recorded as a dependency where their
-        // value is consumed (e.g. the phi at the chain's fallthrough). If the
-        // value is unused that phi has been pruned, so record the chain here
-        // to ensure its base is still declared as an output of its defining
-        // scope, if any.
+        // Unused chains have no consuming phi, so record them here.
+        // See `OptionalChainSidemap::unused_optional_chains`.
         if let Terminal::Optional { .. } = &block.terminal {
             if let Some(dep) = ctx.unused_optional_chains.get(block_id).cloned() {
                 ctx.visit_dependency(dep, env);

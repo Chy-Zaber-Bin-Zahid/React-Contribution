@@ -835,13 +835,8 @@ function collectDependencies(
       }
 
       if (block.terminal.kind === 'optional') {
-        /**
-         * Optional chains are normally recorded as a dependency where their
-         * value is consumed (e.g. the phi at the chain's fallthrough). If the
-         * value is unused that phi has been pruned, so record the chain here
-         * to ensure its base is still declared as an output of its defining
-         * scope, if any.
-         */
+        // Unused chains have no consuming phi, so record them here.
+        // See `OptionalChainSidemap.unusedOptionalChains`.
         const unusedOptionalChain = unusedOptionalChains.get(block.terminal);
         if (unusedOptionalChain != null) {
           context.visitDependency(unusedOptionalChain);
